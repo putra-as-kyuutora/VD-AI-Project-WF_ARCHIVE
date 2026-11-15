@@ -1,0 +1,51 @@
+═══════════════════════════════════════════
+VIOLENCE DISTRICT - GAME SCAN RESULTS
+Generated: 2026-11-16 02:11:28
+═══════════════════════════════════════════
+
+📱 PLATFORM:
+  Type: MOBILE
+  Touch: true
+
+🎮 BUTTONS (536):
+  [1] JumpButton: 'ImageButton'
+  [2] Close: 'ImageButton'
+  [3] Right: 'ImageButton'
+  [4] Left: 'ImageButton'
+  [5] Close: 'ImageButton'
+  [6] Spectate: 'ImageButton'
+  [7] Right: 'ImageButton'
+  [8] Left: 'ImageButton'
+  [9] 1: 'ImageButton'
+  [10] 2: 'ImageButton'
+  [11] 3: 'ImageButton'
+  [12] 4: 'ImageButton'
+  [13] emote: 'ImageButton'
+  [14] 3: 'ImageButton'
+  [15] 7: 'ImageButton'
+  ... +521 more
+
+🧍 CHARACTER:
+  Speed: 10
+  HP: 100/100
+
+🗺️ MAP OBJECTS:
+
+📡 REMOTES (330):
+  VaultEvent (RemoteEvent)
+  VaultAnim-jason (RemoteEvent)
+  VaultCompleteEvent (RemoteEvent)
+  VaultEvent-jason (RemoteEvent)
+  VaultAnim (RemoteEvent)
+  fastvault (RemoteEvent)
+  VaultCompleteEventpart1 (RemoteEvent)
+  VaultCommit (RemoteEvent)
+  VaultReject (RemoteEvent)
+  VaultSfx (RemoteEvent)
+  ... +320 more
+
+👥 SESSION:
+  Team: Spectator
+  Players: 1
+
+═══════════════════════════════════════════
