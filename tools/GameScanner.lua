@@ -292,10 +292,17 @@ local function ScanCharacter()
     local character = LocalPlayer.Character
     if not character then return data end
     
-    -- Get all attributes
+    -- Check for known attributes (based on source code)
     data.Attributes = {}
-    for _, attr in ipairs(character:GetAttributes()) do
-        data.Attributes[attr] = character:GetAttribute(attr)
+    local knownAttributes = {
+        "speedboost", "IsHooked", "Carried", "Grabbed", 
+        "Knocked", "KillerType", "Mask", "SelectedKiller"
+    }
+    for _, attrName in ipairs(knownAttributes) do
+        local value = character:GetAttribute(attrName)
+        if value ~= nil then
+            data.Attributes[attrName] = value
+        end
     end
     
     -- Get humanoid info
@@ -308,10 +315,13 @@ local function ScanCharacter()
             MaxHealth = humanoid.MaxHealth
         }
         
-        -- Get humanoid attributes
+        -- Check humanoid attributes
         data.Humanoid.Attributes = {}
-        for _, attr in ipairs(humanoid:GetAttributes()) do
-            data.Humanoid.Attributes[attr] = humanoid:GetAttribute(attr)
+        for _, attrName in ipairs(knownAttributes) do
+            local value = humanoid:GetAttribute(attrName)
+            if value ~= nil then
+                data.Humanoid.Attributes[attrName] = value
+            end
         end
     end
     
