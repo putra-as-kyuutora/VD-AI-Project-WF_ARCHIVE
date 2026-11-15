@@ -84,7 +84,7 @@ local function CreatePath(targetPosition)
     local path = PathfindingService:CreatePath({
         AgentRadius = 2,
         AgentHeight = 5,
-        AgentCanJump = true,
+        AgentCanJump = false,  -- Violence District has no jump!
         WaypointSpacing = 4
     })
     
@@ -227,12 +227,6 @@ local function UpdatePathfinding()
         end
         
         currentWaypoint = waypoints[State.CurrentWaypointIndex]
-        
-        -- Handle jump
-        if currentWaypoint.Action == Enum.PathWaypointAction.Jump then
-            DebugPrint("Jumping!")
-            Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-        end
     end
     
     -- CRITICAL: Use MoveTo (not Move!) - This is the working method!
