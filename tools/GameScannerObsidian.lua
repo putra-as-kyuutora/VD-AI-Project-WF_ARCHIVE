@@ -252,7 +252,11 @@ InfoBox:AddLabel("Platform: " .. (UserInputService.TouchEnabled and not UserInpu
 -- Actions Section
 local ActionsBox = MainTab:AddRightGroupbox("Actions", "cpu")
 
-local ScanButton = ActionsBox:AddButton("🔍 Scan Game", function()
+ActionsBox:AddLabel("Scan the game to analyze its structure")
+
+ActionsBox:AddDivider()
+
+local ScanButton = ActionsBox:AddButton("🔍 Start Scan", function()
     Library:Notify({
         Title = "Scanner",
         Description = "Scanning game structure...",
@@ -263,9 +267,17 @@ local ScanButton = ActionsBox:AddButton("🔍 Scan Game", function()
     
     ScanResults = ScanAll()
     
+    -- Update Results display
+    ResultsBox:Clear()
+    
+    local formatted = FormatResults(ScanResults)
+    for line in formatted:gmatch("[^\n]+") do
+        ResultsBox:AddLabel(line)
+    end
+    
     Library:Notify({
         Title = "Scanner",
-        Description = "Scan complete! Check Results tab.",
+        Description = "Scan complete! ✅",
         Duration = 3
     })
 end)
@@ -331,7 +343,46 @@ local ResultsTab = Window:AddTab("Results", "file-text")
 
 local ResultsBox = ResultsTab:AddLeftGroupbox("Scan Results", "list")
 
-ResultsBox:AddLabel("Click 'Scan Game' to start"):AddLabel(" "):AddLabel("Results will appear here")
+ResultsBox:AddLabel("Click 'Start Scan' to begin")
+ResultsBox:AddLabel(" ")
+ResultsBox:AddLabel("Results will appear here after scanning")
+
+-- Quick Actions in Results Tab
+local QuickActionsBox = ResultsTab:AddRightGroupbox("Quick Actions", "zap")
+
+QuickActionsBox:AddButton("🔄 Refresh Results", function()
+    if not ScanResults.Timestamp then
+        Library:Notify({
+            Title = "Scanner",
+            Description = "No scan data available",
+            Duration = 2
+        })
+        return
+    end
+    
+    ResultsBox:Clear()
+    local formatted = FormatResults(ScanResults)
+    for line in formatted:gmatch("[^\n]+") do
+        ResultsBox:AddLabel(line)
+    end
+    
+    Library:Notify({
+        Title = "Scanner", 
+        Description = "Results refreshed!",
+        Duration = 2
+    })
+end)
+
+QuickActionsBox:AddButton("🗑️ Clear Results", function()
+    ResultsBox:Clear()
+    ResultsBox:AddLabel("Results cleared")
+    
+    Library:Notify({
+        Title = "Scanner",
+        Description = "Results cleared",
+        Duration = 2
+    })
+end)
 
 -- Auto-scan on load
 task.spawn(function()
@@ -366,8 +417,15 @@ ThemeBox:AddDropdown("NotificationSide", {
     end
 })
 
--- Menu Keybind
-Library.ToggleKeybind = Options.MenuKeybind
+-- Add menu keybind section
+local MenuGroup = SettingsTab:AddRightGroupbox("Menu", "wrench")
+MenuGroup:AddLabel("Menu Keybind"):AddKeyPicker("MenuKeybind", {
+    Default = "RightShift",
+    NoUI = true,
+    Text = "Menu keybind"
+})
+
+Library.ToggleKeybind = Library.Options.MenuKeybind
 
 print("════════════════════════════════════════")
 print("✅ VD Game Scanner v4.0 Loaded!")
