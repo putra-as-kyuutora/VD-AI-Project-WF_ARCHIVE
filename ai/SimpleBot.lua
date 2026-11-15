@@ -9,11 +9,24 @@ print("🤖 Loading Violence District AI Bot...")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local PathfindingService = game:GetService("PathfindingService")
+local UserInputService = game:GetService("UserInputService")
 
 local LocalPlayer = Players.LocalPlayer
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local Humanoid = Character:WaitForChild("Humanoid")
 local RootPart = Character:WaitForChild("HumanoidRootPart")
+
+-- Get PlayerModule for mobile control
+local PlayerModule = nil
+local PlayerControls = nil
+
+pcall(function()
+    PlayerModule = LocalPlayer.PlayerScripts:WaitForChild("PlayerModule", 3)
+    if PlayerModule then
+        local ControlModule = require(PlayerModule:WaitForChild("ControlModule"))
+        PlayerControls = ControlModule
+    end
+end)
 
 -- ════════════════════════════════════════
 -- CONFIG
@@ -26,7 +39,8 @@ local Config = {
     PathRefreshInterval = 2,
     UpdateRate = 0.1,
     AvoidWalls = true,
-    Debug = true
+    Debug = true,
+    MovementMode = "Auto" -- "Auto", "Humanoid", "CFrame", "WalkToPoint"
 }
 
 -- ════════════════════════════════════════
@@ -94,11 +108,75 @@ local function GetDistanceToTarget()
 end
 
 -- ════════════════════════════════════════
+-- MOVEMENT METHODS
+-- ════════════════════════════════════════
+
+local function MoveToPosition_Humanoid(targetPosition)
+    -- Method 1: Humanoid:Move (standard)
+    local direction = (targetPosition - RootPart.Position).Unit
+    Humanoid:Move(direction)
+end
+
+local function MoveToPosition_WalkToPoint(targetPosition)
+    -- Method 2: WalkToPoint (simple & reliable)
+    Humanoid:MoveTo(targetPosition)
+end
+
+local function MoveToPosition_CFrame(targetPosition)
+    -- Method 3: CFrame (direct but may look robotic)
+    local distance = (targetPosition - RootPart.Position).Magnitude
+    local speed = Humanoid.WalkSpeed
+    
+    if distance > 0.5 then
+        local direction = (targetPosition - RootPart.Position).Unit
+        local moveStep = direction * math.min(speed * Config.UpdateRate, distance)
+        RootPart.CFrame = RootPart.CFrame + moveStep
+    end
+end
+
+local function MoveToPosition_PlayerControls(targetPosition)
+    -- Method 4: Use PlayerModule (simulate analog stick)
+    if PlayerControls then
+        local direction = (targetPosition - RootPart.Position).Unit
+        -- This simulates player input
+        pcall(function()
+            local moveVector = Vector3.new(direction.X, 0, direction.Z)
+            -- Try to access player controls
+            -- Note: This might not work on all executors
+            game:GetService("ContextActionService"):BindAction("BotMove", function() end, false, Enum.KeyCode.W)
+        end)
+    end
+    -- Fallback to humanoid
+    MoveToPosition_Humanoid(targetPosition)
+end
+
+local function MoveToPosition(targetPosition)
+    -- Auto-detect best method
+    if Config.MovementMode == "Humanoid" then
+        MoveToPosition_Humanoid(targetPosition)
+    elseif Config.MovementMode == "WalkToPoint" then
+        MoveToPosition_WalkToPoint(targetPosition)
+    elseif Config.MovementMode == "CFrame" then
+        MoveToPosition_CFrame(targetPosition)
+    else
+        -- Auto mode: try WalkToPoint first (most reliable)
+        MoveToPosition_WalkToPoint(targetPosition)
+    end
+end
+
+-- ════════════════════════════════════════
 -- MOVEMENT
 -- ════════════════════════════════════════
 
 local function StopMoving()
+    -- Stop all movement methods
     Humanoid:Move(Vector3.new(0, 0, 0))
+    
+    -- Cancel MoveTo if active
+    pcall(function()
+        Humanoid:MoveTo(RootPart.Position)
+    end)
+    
     State.CurrentPath = nil
     State.CurrentWaypointIndex = 0
     DebugPrint("Stopped moving")
@@ -117,10 +195,9 @@ local function StartPatrol()
         State.CurrentWaypointIndex = 1
         DebugPrint("Path created with " .. #path:GetWaypoints() .. " waypoints")
     else
-        -- Fallback: direct movement
+        -- Fallback: direct movement without pathfinding
         DebugPrint("Using direct movement fallback")
-        local direction = (targetPos - RootPart.Position).Unit
-        Humanoid:Move(direction)
+        MoveToPosition(targetPos)
     end
 end
 
@@ -161,8 +238,7 @@ local function UpdatePathfinding()
     end
     
     -- Move towards current waypoint
-    local direction = (currentWaypoint.Position - RootPart.Position).Unit
-    Humanoid:Move(direction)
+    MoveToPosition(currentWaypoint.Position)
     
     return true
 end
@@ -257,6 +333,7 @@ local function StartBot()
     print("🤖 BOT STARTED!")
     print("  Walk Speed: " .. Config.WalkSpeed)
     print("  Patrol Radius: " .. Config.PatrolRadius)
+    print("  Movement Mode: " .. Config.MovementMode)
     print("  To stop: StopBot()")
     print("════════════════════════════════════════")
     
@@ -330,7 +407,14 @@ print("")
 print("⚙️ Config (edit BotConfig):")
 print("  BotConfig.WalkSpeed = 16")
 print("  BotConfig.PatrolRadius = 50")
+print("  BotConfig.MovementMode = 'WalkToPoint' or 'CFrame' or 'Humanoid'")
 print("  BotConfig.Debug = true/false")
+print("")
+print("💡 Movement Modes:")
+print("  'Auto' (default) - Try best method")
+print("  'WalkToPoint' - Use Humanoid:MoveTo() (recommended for mobile)")
+print("  'CFrame' - Direct position manipulation (smooth)")
+print("  'Humanoid' - Standard Humanoid:Move()")
 print("")
 
 -- Auto start
