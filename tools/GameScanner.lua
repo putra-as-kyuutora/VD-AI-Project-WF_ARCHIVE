@@ -11,10 +11,20 @@ local GameScanner = {
 -- Services
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
-local CoreGui = game:GetService("CoreGui")
+local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local LocalPlayer = Players.LocalPlayer
+
+-- Safe pcall wrapper
+local function safePcall(func, ...)
+    local success, result = pcall(func, ...)
+    if not success then
+        warn("[GameScanner Error] " .. tostring(result))
+        return nil
+    end
+    return result
+end
 
 -- ============================================
 -- UI Creation
@@ -26,13 +36,9 @@ local function CreateUI()
     ScreenGui.ResetOnSpawn = false
     ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     
-    -- Try to parent to CoreGui, fallback to PlayerGui
-    local success = pcall(function()
-        ScreenGui.Parent = CoreGui
-    end)
-    if not success then
-        ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-    end
+    -- Parent to PlayerGui (safer for mobile)
+    local playerGui = LocalPlayer:WaitForChild("PlayerGui")
+    ScreenGui.Parent = playerGui
     
     -- Main Frame
     local MainFrame = Instance.new("Frame")
@@ -249,8 +255,14 @@ local function ScanPlayerGUI()
         Mobile = {}
     }
     
-    local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
-    if not playerGui then return data end
+    local success, playerGui = pcall(function()
+        return LocalPlayer:FindFirstChild("PlayerGui")
+    end)
+    
+    if not success or not playerGui then 
+        warn("[GameScanner] PlayerGui not found")
+        return data 
+    end
     
     -- Scan for SkillCheck GUI
     local skillCheckGui = playerGui:FindFirstChild("SkillCheckPromptGui")
@@ -267,20 +279,22 @@ local function ScanPlayerGUI()
         end
     end
     
-    -- Scan for Mobile Buttons
+    -- Scan for Mobile Buttons (safe iteration)
     for _, gui in ipairs(playerGui:GetChildren()) do
-        for _, obj in ipairs(gui:GetDescendants()) do
-            if obj:IsA("TextButton") or obj:IsA("ImageButton") then
-                local buttonInfo = {
-                    Name = obj.Name,
-                    Path = obj:GetFullName(),
-                    Text = obj:IsA("TextButton") and obj.Text or "ImageButton",
-                    Visible = obj.Visible,
-                    Parent = obj.Parent.Name
-                }
-                table.insert(data.Mobile, buttonInfo)
+        safePcall(function()
+            for _, obj in ipairs(gui:GetDescendants()) do
+                if obj:IsA("TextButton") or obj:IsA("ImageButton") then
+                    local buttonInfo = {
+                        Name = obj.Name,
+                        Path = obj:GetFullName(),
+                        Text = obj:IsA("TextButton") and obj.Text or "ImageButton",
+                        Visible = obj.Visible,
+                        Parent = obj.Parent.Name
+                    }
+                    table.insert(data.Mobile, buttonInfo)
+                end
             end
-        end
+        end)
     end
     
     return data
@@ -342,19 +356,21 @@ local function ScanRemotes()
         Found = {}
     }
     
-    -- Scan ReplicatedStorage
-    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
-    if remotes then
-        for _, remote in ipairs(remotes:GetDescendants()) do
-            if remote:IsA("RemoteEvent") or remote:IsA("RemoteFunction") then
-                table.insert(data.ReplicatedStorage, {
-                    Name = remote.Name,
-                    Type = remote.ClassName,
-                    Path = remote:GetFullName()
-                })
+    -- Scan ReplicatedStorage safely
+    safePcall(function()
+        local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+        if remotes then
+            for _, remote in ipairs(remotes:GetDescendants()) do
+                if remote:IsA("RemoteEvent") or remote:IsA("RemoteFunction") then
+                    table.insert(data.ReplicatedStorage, {
+                        Name = remote.Name,
+                        Type = remote.ClassName,
+                        Path = remote:GetFullName()
+                    })
+                end
             end
         end
-    end
+    end)
     
     return data
 end
@@ -365,31 +381,41 @@ local function ScanMap()
         Structure = {}
     }
     
-    local map = workspace:FindFirstChild("Map")
-    if not map then return data end
+    local success, map = pcall(function()
+        return workspace:FindFirstChild("Map")
+    end)
     
-    -- Object counts
+    if not success or not map then 
+        warn("[GameScanner] Map not found in workspace")
+        return data 
+    end
+    
+    -- Object counts (safe)
     local objectTypes = {
         "Generator", "Window", "Palletwrong", "PalletAlien", 
         "Hook", "Gate"
     }
     
     for _, objType in ipairs(objectTypes) do
-        local count = 0
-        for _, obj in ipairs(map:GetDescendants()) do
-            if obj.Name == objType then
-                count = count + 1
+        safePcall(function()
+            local count = 0
+            for _, obj in ipairs(map:GetDescendants()) do
+                if obj.Name == objType then
+                    count = count + 1
+                end
             end
-        end
-        if count > 0 then
-            data.Objects[objType] = count
-        end
+            if count > 0 then
+                data.Objects[objType] = count
+            end
+        end)
     end
     
-    -- Map structure
-    for _, child in ipairs(map:GetChildren()) do
-        table.insert(data.Structure, child.Name .. " (" .. child.ClassName .. ")")
-    end
+    -- Map structure (safe)
+    safePcall(function()
+        for _, child in ipairs(map:GetChildren()) do
+            table.insert(data.Structure, child.Name .. " (" .. child.ClassName .. ")")
+        end
+    end)
     
     return data
 end
