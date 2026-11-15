@@ -1,197 +1,187 @@
 -- ============================================
--- Violence District Game Scanner
--- Scans game structure and saves configuration for AI
+-- Violence District Game Scanner v2.0
+-- Scans game structure with proper GUI
 -- ============================================
 
 local GameScanner = {
-    Version = "1.0.0",
-    ScanData = {}
+    Version = "2.0.0",
+    ScanData = {},
+    UI = {}
 }
 
 -- Services
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local LocalPlayer = Players.LocalPlayer
 
--- Safe pcall wrapper
-local function safePcall(func, ...)
-    local success, result = pcall(func, ...)
-    if not success then
-        warn("[GameScanner Error] " .. tostring(result))
-        return nil
-    end
-    return result
-end
+print("[GameScanner] Loading...")
 
 -- ============================================
 -- UI Creation
 -- ============================================
 
+-- ════════════════════════════════════════
+-- UI CREATION (Simplified & Safe)
+-- ════════════════════════════════════════
+
 local function CreateUI()
+    -- Create ScreenGui
     local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "GameScannerUI"
+    ScreenGui.Name = "VD_GameScannerUI"
     ScreenGui.ResetOnSpawn = false
     ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     
-    -- Parent to PlayerGui (safer for mobile)
-    local playerGui = LocalPlayer:WaitForChild("PlayerGui")
-    ScreenGui.Parent = playerGui
+    -- Safe parent
+    pcall(function()
+        ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui", 5)
+    end)
     
-    -- Main Frame
+    if not ScreenGui.Parent then
+        warn("[Scanner] Failed to parent GUI")
+        return nil
+    end
+    
+    -- Main Frame (Draggable Window)
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "MainFrame"
-    MainFrame.Size = UDim2.new(0, 500, 0, 600)
-    MainFrame.Position = UDim2.new(0.5, -250, 0.5, -300)
-    MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+    MainFrame.Size = UDim2.new(0, 450, 0, 550)
+    MainFrame.Position = UDim2.new(0.5, -225, 0.5, -275)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
     MainFrame.BorderSizePixel = 0
     MainFrame.Active = true
     MainFrame.Draggable = true
     MainFrame.Parent = ScreenGui
     
-    -- Add corner radius
-    local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UDim.new(0, 8)
-    Corner.Parent = MainFrame
+    -- Corner radius
+    Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
     
     -- Title Bar
     local TitleBar = Instance.new("Frame")
     TitleBar.Name = "TitleBar"
-    TitleBar.Size = UDim2.new(1, 0, 0, 40)
-    TitleBar.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+    TitleBar.Size = UDim2.new(1, 0, 0, 35)
+    TitleBar.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
     TitleBar.BorderSizePixel = 0
     TitleBar.Parent = MainFrame
     
-    local TitleCorner = Instance.new("UICorner")
-    TitleCorner.CornerRadius = UDim.new(0, 8)
-    TitleCorner.Parent = TitleBar
+    Instance.new("UICorner", TitleBar).CornerRadius = UDim.new(0, 10)
     
+    -- Title
     local TitleLabel = Instance.new("TextLabel")
-    TitleLabel.Name = "TitleLabel"
-    TitleLabel.Size = UDim2.new(1, -100, 1, 0)
+    TitleLabel.Size = UDim2.new(1, -80, 1, 0)
     TitleLabel.Position = UDim2.new(0, 10, 0, 0)
     TitleLabel.BackgroundTransparency = 1
-    TitleLabel.Text = "🔍 Violence District - Game Scanner"
+    TitleLabel.Text = "VD Game Scanner"
     TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    TitleLabel.TextSize = 16
+    TitleLabel.TextSize = 14
     TitleLabel.Font = Enum.Font.GothamBold
     TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
     TitleLabel.Parent = TitleBar
     
     -- Close Button
     local CloseButton = Instance.new("TextButton")
-    CloseButton.Name = "CloseButton"
-    CloseButton.Size = UDim2.new(0, 30, 0, 30)
-    CloseButton.Position = UDim2.new(1, -35, 0, 5)
-    CloseButton.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
-    CloseButton.Text = "✕"
+    CloseButton.Size = UDim2.new(0, 25, 0, 25)
+    CloseButton.Position = UDim2.new(1, -30, 0.5, -12.5)
+    CloseButton.AnchorPoint = Vector2.new(0, 0.5)
+    CloseButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    CloseButton.Text = "X"
     CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    CloseButton.TextSize = 16
+    CloseButton.TextSize = 12
     CloseButton.Font = Enum.Font.GothamBold
     CloseButton.BorderSizePixel = 0
     CloseButton.Parent = TitleBar
     
-    local CloseCorner = Instance.new("UICorner")
-    CloseCorner.CornerRadius = UDim.new(0, 4)
-    CloseCorner.Parent = CloseButton
+    Instance.new("UICorner", CloseButton).CornerRadius = UDim.new(0, 5)
     
     CloseButton.MouseButton1Click:Connect(function()
-        ScreenGui:Destroy()
+        pcall(function() ScreenGui:Destroy() end)
     end)
     
-    -- Scroll Frame for Content
-    local ScrollFrame = Instance.new("ScrollingFrame")
-    ScrollFrame.Name = "ScrollFrame"
-    ScrollFrame.Size = UDim2.new(1, -20, 1, -130)
-    ScrollFrame.Position = UDim2.new(0, 10, 0, 50)
-    ScrollFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-    ScrollFrame.BorderSizePixel = 0
-    ScrollFrame.ScrollBarThickness = 6
-    ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-    ScrollFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    ScrollFrame.Parent = MainFrame
+    -- Content Frame (scrollable)
+    local ContentFrame = Instance.new("ScrollingFrame")
+    ContentFrame.Name = "ContentFrame"
+    ContentFrame.Size = UDim2.new(1, -20, 1, -120)
+    ContentFrame.Position = UDim2.new(0, 10, 0, 45)
+    ContentFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+    ContentFrame.BorderSizePixel = 0
+    ContentFrame.ScrollBarThickness = 4
+    ContentFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+    ContentFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    ContentFrame.Parent = MainFrame
     
-    local ScrollCorner = Instance.new("UICorner")
-    ScrollCorner.CornerRadius = UDim.new(0, 6)
-    ScrollCorner.Parent = ScrollFrame
+    Instance.new("UICorner", ContentFrame).CornerRadius = UDim.new(0, 8)
     
-    -- List Layout for content
+    -- Layout for content
     local ListLayout = Instance.new("UIListLayout")
-    ListLayout.Padding = UDim.new(0, 8)
+    ListLayout.Padding = UDim.new(0, 5)
     ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    ListLayout.Parent = ScrollFrame
+    ListLayout.Parent = ContentFrame
     
     local Padding = Instance.new("UIPadding")
-    Padding.PaddingLeft = UDim.new(0, 10)
-    Padding.PaddingRight = UDim.new(0, 10)
-    Padding.PaddingTop = UDim.new(0, 10)
-    Padding.PaddingBottom = UDim.new(0, 10)
-    Padding.Parent = ScrollFrame
+    Padding.PaddingLeft = UDim.new(0, 8)
+    Padding.PaddingRight = UDim.new(0, 8)
+    Padding.PaddingTop = UDim.new(0, 8)
+    Padding.PaddingBottom = UDim.new(0, 8)
+    Padding.Parent = ContentFrame
     
-    -- Output Text Label
-    local OutputLabel = Instance.new("TextLabel")
-    OutputLabel.Name = "OutputLabel"
-    OutputLabel.Size = UDim2.new(1, -20, 0, 30)
-    OutputLabel.Position = UDim2.new(0, 10, 1, -75)
-    OutputLabel.BackgroundTransparency = 1
-    OutputLabel.Text = "Status: Ready to scan"
-    OutputLabel.TextColor3 = Color3.fromRGB(100, 200, 100)
-    OutputLabel.TextSize = 12
-    OutputLabel.Font = Enum.Font.GothamMedium
-    OutputLabel.TextXAlignment = Enum.TextXAlignment.Left
-    OutputLabel.Parent = MainFrame
+    -- Status Label
+    local StatusLabel = Instance.new("TextLabel")
+    StatusLabel.Name = "StatusLabel"
+    StatusLabel.Size = UDim2.new(1, -20, 0, 25)
+    StatusLabel.Position = UDim2.new(0, 10, 1, -70)
+    StatusLabel.BackgroundTransparency = 1
+    StatusLabel.Text = "Ready to scan"
+    StatusLabel.TextColor3 = Color3.fromRGB(100, 200, 100)
+    StatusLabel.TextSize = 11
+    StatusLabel.Font = Enum.Font.Gotham
+    StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
+    StatusLabel.Parent = MainFrame
     
     -- Button Container
-    local ButtonFrame = Instance.new("Frame")
-    ButtonFrame.Name = "ButtonFrame"
-    ButtonFrame.Size = UDim2.new(1, -20, 0, 35)
-    ButtonFrame.Position = UDim2.new(0, 10, 1, -40)
-    ButtonFrame.BackgroundTransparency = 1
-    ButtonFrame.Parent = MainFrame
+    local ButtonContainer = Instance.new("Frame")
+    ButtonContainer.Size = UDim2.new(1, -20, 0, 35)
+    ButtonContainer.Position = UDim2.new(0, 10, 1, -45)
+    ButtonContainer.BackgroundTransparency = 1
+    ButtonContainer.Parent = MainFrame
     
     -- Scan Button
     local ScanButton = Instance.new("TextButton")
-    ScanButton.Name = "ScanButton"
     ScanButton.Size = UDim2.new(0.48, 0, 1, 0)
     ScanButton.Position = UDim2.new(0, 0, 0, 0)
-    ScanButton.BackgroundColor3 = Color3.fromRGB(60, 150, 255)
-    ScanButton.Text = "🔍 Scan Game"
+    ScanButton.BackgroundColor3 = Color3.fromRGB(50, 120, 200)
+    ScanButton.Text = "Scan Game"
     ScanButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    ScanButton.TextSize = 14
+    ScanButton.TextSize = 12
     ScanButton.Font = Enum.Font.GothamBold
     ScanButton.BorderSizePixel = 0
-    ScanButton.Parent = ButtonFrame
+    ScanButton.Parent = ButtonContainer
     
-    local ScanCorner = Instance.new("UICorner")
-    ScanCorner.CornerRadius = UDim.new(0, 6)
-    ScanCorner.Parent = ScanButton
+    Instance.new("UICorner", ScanButton).CornerRadius = UDim.new(0, 6)
     
-    -- Save Button
-    local SaveButton = Instance.new("TextButton")
-    SaveButton.Name = "SaveButton"
-    SaveButton.Size = UDim2.new(0.48, 0, 1, 0)
-    SaveButton.Position = UDim2.new(0.52, 0, 0, 0)
-    SaveButton.BackgroundColor3 = Color3.fromRGB(60, 200, 100)
-    SaveButton.Text = "💾 Copy to Clipboard"
-    SaveButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    SaveButton.TextSize = 14
-    SaveButton.Font = Enum.Font.GothamBold
-    SaveButton.BorderSizePixel = 0
-    SaveButton.Parent = ButtonFrame
+    -- Copy Button
+    local CopyButton = Instance.new("TextButton")
+    CopyButton.Size = UDim2.new(0.48, 0, 1, 0)
+    CopyButton.Position = UDim2.new(0.52, 0, 0, 0)
+    CopyButton.BackgroundColor3 = Color3.fromRGB(50, 180, 100)
+    CopyButton.Text = "Copy Results"
+    CopyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    CopyButton.TextSize = 12
+    CopyButton.Font = Enum.Font.GothamBold
+    CopyButton.BorderSizePixel = 0
+    CopyButton.Parent = ButtonContainer
     
-    local SaveCorner = Instance.new("UICorner")
-    SaveCorner.CornerRadius = UDim.new(0, 6)
-    SaveCorner.Parent = SaveButton
+    Instance.new("UICorner", CopyButton).CornerRadius = UDim.new(0, 6)
+    
+    print("[GameScanner] UI created successfully")
     
     return {
         ScreenGui = ScreenGui,
         MainFrame = MainFrame,
-        ScrollFrame = ScrollFrame,
-        OutputLabel = OutputLabel,
+        ContentFrame = ContentFrame,
+        StatusLabel = StatusLabel,
         ScanButton = ScanButton,
-        SaveButton = SaveButton
+        CopyButton = CopyButton
     }
 end
 
@@ -199,55 +189,28 @@ end
 -- Scan Functions
 -- ============================================
 
-local function AddSectionToUI(scrollFrame, title, content, color)
-    local Section = Instance.new("Frame")
-    Section.Name = title
-    Section.Size = UDim2.new(1, 0, 0, 0)
-    Section.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
-    Section.BorderSizePixel = 0
-    Section.AutomaticSize = Enum.AutomaticSize.Y
-    Section.Parent = scrollFrame
-    
-    local SectionCorner = Instance.new("UICorner")
-    SectionCorner.CornerRadius = UDim.new(0, 6)
-    SectionCorner.Parent = Section
-    
-    local SectionLayout = Instance.new("UIListLayout")
-    SectionLayout.Padding = UDim.new(0, 5)
-    SectionLayout.Parent = Section
-    
-    local SectionPadding = Instance.new("UIPadding")
-    SectionPadding.PaddingLeft = UDim.new(0, 10)
-    SectionPadding.PaddingRight = UDim.new(0, 10)
-    SectionPadding.PaddingTop = UDim.new(0, 8)
-    SectionPadding.PaddingBottom = UDim.new(0, 8)
-    SectionPadding.Parent = Section
-    
-    -- Title
-    local TitleLabel = Instance.new("TextLabel")
-    TitleLabel.Size = UDim2.new(1, 0, 0, 20)
-    TitleLabel.BackgroundTransparency = 1
-    TitleLabel.Text = "📋 " .. title
-    TitleLabel.TextColor3 = color or Color3.fromRGB(100, 180, 255)
-    TitleLabel.TextSize = 14
-    TitleLabel.Font = Enum.Font.GothamBold
-    TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    TitleLabel.Parent = Section
-    
-    -- Content
-    local ContentLabel = Instance.new("TextLabel")
-    ContentLabel.Size = UDim2.new(1, 0, 0, 0)
-    ContentLabel.BackgroundTransparency = 1
-    ContentLabel.Text = content
-    ContentLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
-    ContentLabel.TextSize = 11
-    ContentLabel.Font = Enum.Font.Code
-    ContentLabel.TextXAlignment = Enum.TextXAlignment.Left
-    ContentLabel.TextYAlignment = Enum.TextYAlignment.Top
-    ContentLabel.TextWrapped = true
-    ContentLabel.AutomaticSize = Enum.AutomaticSize.Y
-    ContentLabel.Parent = Section
+-- ════════════════════════════════════════
+-- DISPLAY FUNCTIONS
+-- ════════════════════════════════════════
+
+local function AddResultText(parent, text, color)
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Size = UDim2.new(1, -10, 0, 0)
+    textLabel.BackgroundTransparency = 1
+    textLabel.Text = text
+    textLabel.TextColor3 = color or Color3.fromRGB(200, 200, 200)
+    textLabel.TextSize = 10
+    textLabel.Font = Enum.Font.Code
+    textLabel.TextXAlignment = Enum.TextXAlignment.Left
+    textLabel.TextYAlignment = Enum.TextYAlignment.Top
+    textLabel.TextWrapped = true
+    textLabel.AutomaticSize = Enum.AutomaticSize.Y
+    textLabel.Parent = parent
 end
+
+-- ════════════════════════════════════════
+-- SCAN FUNCTIONS (Safe versions)
+-- ════════════════════════════════════════
 
 local function ScanPlayerGUI()
     local data = {
@@ -255,33 +218,27 @@ local function ScanPlayerGUI()
         Mobile = {}
     }
     
-    local success, playerGui = pcall(function()
-        return LocalPlayer:FindFirstChild("PlayerGui")
-    end)
-    
-    if not success or not playerGui then 
-        warn("[GameScanner] PlayerGui not found")
-        return data 
-    end
-    
-    -- Scan for SkillCheck GUI
-    local skillCheckGui = playerGui:FindFirstChild("SkillCheckPromptGui")
-    if skillCheckGui then
-        data.Found["SkillCheckPromptGui"] = {
-            Path = "PlayerGui.SkillCheckPromptGui",
-            Children = {}
-        }
+    pcall(function()
+        local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
+        if not playerGui then return end
         
-        for _, child in ipairs(skillCheckGui:GetDescendants()) do
-            if child:IsA("GuiObject") then
-                table.insert(data.Found["SkillCheckPromptGui"].Children, child.Name)
+        -- Scan for SkillCheck GUI
+        local skillCheckGui = playerGui:FindFirstChild("SkillCheckPromptGui")
+        if skillCheckGui then
+            data.Found["SkillCheckPromptGui"] = {
+                Path = "PlayerGui.SkillCheckPromptGui",
+                Children = {}
+            }
+            
+            for _, child in ipairs(skillCheckGui:GetDescendants()) do
+                if child:IsA("GuiObject") then
+                    table.insert(data.Found["SkillCheckPromptGui"].Children, child.Name)
+                end
             end
         end
-    end
-    
-    -- Scan for Mobile Buttons (safe iteration)
-    for _, gui in ipairs(playerGui:GetChildren()) do
-        safePcall(function()
+        
+        -- Scan for Mobile Buttons
+        for _, gui in ipairs(playerGui:GetChildren()) do
             for _, obj in ipairs(gui:GetDescendants()) do
                 if obj:IsA("TextButton") or obj:IsA("ImageButton") then
                     local buttonInfo = {
@@ -294,8 +251,8 @@ local function ScanPlayerGUI()
                     table.insert(data.Mobile, buttonInfo)
                 end
             end
-        end)
-    end
+        end
+    end)
     
     return data
 end
@@ -531,58 +488,136 @@ end
 
 local UI = CreateUI()
 
--- Scan Button Handler
-UI.ScanButton.MouseButton1Click:Connect(function()
-    UI.OutputLabel.Text = "Status: Scanning..."
-    UI.OutputLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
-    
-    -- Clear previous results
-    for _, child in ipairs(UI.ScrollFrame:GetChildren()) do
-        if child:IsA("Frame") then
-            child:Destroy()
-        end
-    end
-    
-    task.wait(0.5)
-    
-    -- Perform scan
-    local scanData = GameScanner:PerformScan()
-    
-    -- Display results
-    local formatted = GameScanner:FormatData()
-    
-    AddSectionToUI(UI.ScrollFrame, "Scan Results", formatted, Color3.fromRGB(100, 200, 255))
-    
-    UI.OutputLabel.Text = "Status: Scan complete! ✅"
-    UI.OutputLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
-end)
+-- ════════════════════════════════════════
+-- BUTTON HANDLERS
+-- ════════════════════════════════════════
 
--- Save Button Handler
-UI.SaveButton.MouseButton1Click:Connect(function()
-    if not GameScanner.ScanData.Timestamp then
-        UI.OutputLabel.Text = "Status: Please scan first!"
-        UI.OutputLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+local function InitializeUI()
+    local UI = CreateUI()
+    
+    if not UI then
+        warn("[GameScanner] Failed to create UI")
         return
     end
     
-    local formatted = GameScanner:FormatData()
+    GameScanner.UI = UI
     
-    -- Copy to clipboard (if supported)
-    local success = pcall(function()
-        setclipboard(formatted)
+    -- Scan Button Handler
+    UI.ScanButton.MouseButton1Click:Connect(function()
+        UI.StatusLabel.Text = "Scanning..."
+        UI.StatusLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
+        
+        -- Clear previous results
+        for _, child in ipairs(UI.ContentFrame:GetChildren()) do
+            if child:IsA("TextLabel") then
+                child:Destroy()
+            end
+        end
+        
+        task.wait(0.3)
+        
+        -- Perform scan
+        local scanData = GameScanner:PerformScan()
+        
+        -- Display results
+        AddResultText(UI.ContentFrame, "=".rep(40), Color3.fromRGB(100, 150, 255))
+        AddResultText(UI.ContentFrame, "VIOLENCE DISTRICT - SCAN RESULTS", Color3.fromRGB(100, 200, 255))
+        AddResultText(UI.ContentFrame, "Generated: " .. os.date("%H:%M:%S"), Color3.fromRGB(150, 150, 150))
+        AddResultText(UI.ContentFrame, "=".rep(40), Color3.fromRGB(100, 150, 255))
+        AddResultText(UI.ContentFrame, "", Color3.fromRGB(255, 255, 255))
+        
+        -- Input System
+        AddResultText(UI.ContentFrame, "INPUT SYSTEM:", Color3.fromRGB(255, 200, 100))
+        AddResultText(UI.ContentFrame, "  Platform: " .. (scanData.Input.IsMobile and "MOBILE" or "PC"))
+        AddResultText(UI.ContentFrame, "  Touch: " .. tostring(scanData.Input.TouchEnabled))
+        AddResultText(UI.ContentFrame, "", Color3.fromRGB(255, 255, 255))
+        
+        -- Mobile Buttons
+        if #scanData.PlayerGUI.Mobile > 0 then
+            AddResultText(UI.ContentFrame, "MOBILE BUTTONS (" .. #scanData.PlayerGUI.Mobile .. " found):", Color3.fromRGB(100, 255, 150))
+            local shown = 0
+            for i, btn in ipairs(scanData.PlayerGUI.Mobile) do
+                if shown < 15 then
+                    AddResultText(UI.ContentFrame, string.format("  [%d] %s: '%s'", i, btn.Name, btn.Text))
+                    shown = shown + 1
+                end
+            end
+            if #scanData.PlayerGUI.Mobile > 15 then
+                AddResultText(UI.ContentFrame, "  ... +" .. (#scanData.PlayerGUI.Mobile - 15) .. " more")
+            end
+            AddResultText(UI.ContentFrame, "", Color3.fromRGB(255, 255, 255))
+        end
+        
+        -- Character Info
+        if scanData.Character.Humanoid then
+            AddResultText(UI.ContentFrame, "CHARACTER:", Color3.fromRGB(255, 150, 100))
+            AddResultText(UI.ContentFrame, "  WalkSpeed: " .. scanData.Character.Humanoid.WalkSpeed)
+            AddResultText(UI.ContentFrame, "  Health: " .. scanData.Character.Humanoid.Health .. "/" .. scanData.Character.Humanoid.MaxHealth)
+            AddResultText(UI.ContentFrame, "", Color3.fromRGB(255, 255, 255))
+        end
+        
+        -- Map Objects
+        if next(scanData.Map.Objects) then
+            AddResultText(UI.ContentFrame, "MAP OBJECTS:", Color3.fromRGB(150, 255, 150))
+            for objType, count in pairs(scanData.Map.Objects) do
+                AddResultText(UI.ContentFrame, "  " .. objType .. ": " .. count)
+            end
+            AddResultText(UI.ContentFrame, "", Color3.fromRGB(255, 255, 255))
+        end
+        
+        -- Remotes
+        if #scanData.Remotes.ReplicatedStorage > 0 then
+            AddResultText(UI.ContentFrame, "REMOTES (" .. #scanData.Remotes.ReplicatedStorage .. " found):", Color3.fromRGB(255, 200, 150))
+            for i = 1, math.min(10, #scanData.Remotes.ReplicatedStorage) do
+                local remote = scanData.Remotes.ReplicatedStorage[i]
+                AddResultText(UI.ContentFrame, "  " .. remote.Name .. " (" .. remote.Type .. ")")
+            end
+            if #scanData.Remotes.ReplicatedStorage > 10 then
+                AddResultText(UI.ContentFrame, "  ... +" .. (#scanData.Remotes.ReplicatedStorage - 10) .. " more")
+            end
+        end
+        
+        AddResultText(UI.ContentFrame, "", Color3.fromRGB(255, 255, 255))
+        AddResultText(UI.ContentFrame, "=".rep(40), Color3.fromRGB(100, 150, 255))
+        
+        UI.StatusLabel.Text = "Scan complete!"
+        UI.StatusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
     end)
     
-    if success then
-        UI.OutputLabel.Text = "Status: Copied to clipboard! 📋"
-        UI.OutputLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
-    else
-        UI.OutputLabel.Text = "Status: Clipboard not supported. Check console for output."
-        UI.OutputLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
-        print("\n" .. formatted .. "\n")
-    end
-end)
+    -- Copy Button Handler
+    UI.CopyButton.MouseButton1Click:Connect(function()
+        if not GameScanner.ScanData.Timestamp then
+            UI.StatusLabel.Text = "Please scan first!"
+            UI.StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+            return
+        end
+        
+        local formatted = GameScanner:FormatData()
+        
+        -- Try to copy
+        local success = pcall(function()
+            setclipboard(formatted)
+        end)
+        
+        if success then
+            UI.StatusLabel.Text = "Copied to clipboard!"
+            UI.StatusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+        else
+            UI.StatusLabel.Text = "Clipboard not supported (check console)"
+            UI.StatusLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
+            print("\n" .. formatted .. "\n")
+        end
+    end)
+    
+    print("[GameScanner] UI initialized successfully")
+end
 
-print("🔍 Game Scanner loaded! UI should be visible.")
-print("📱 Use the UI to scan Violence District game structure.")
+-- ════════════════════════════════════════
+-- INITIALIZE
+-- ════════════════════════════════════════
+
+print("[GameScanner] Initializing UI...")
+InitializeUI()
+print("[GameScanner] Ready! Open the GUI and click 'Scan Game'")
 
 return GameScanner
