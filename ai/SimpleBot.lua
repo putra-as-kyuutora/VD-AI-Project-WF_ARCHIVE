@@ -48,11 +48,12 @@ local Config = {
 -- ════════════════════════════════════════
 local State = {
     IsActive = false,
-    CurrentPath = nil,
-    CurrentWaypointIndex = 0,
+    CurrentPath = nil,  -- Now stores waypoints array, not path object
+    CurrentWaypointIndex = 1,
     TargetPosition = nil,
     LastPathTime = 0,
-    LastUpdateTime = 0
+    LastUpdateTime = 0,
+    LastDecisionTime = 0
 }
 
 -- ════════════════════════════════════════
@@ -84,10 +85,7 @@ local function CreatePath(targetPosition)
         AgentRadius = 2,
         AgentHeight = 5,
         AgentCanJump = true,
-        WaypointSpacing = 4,
-        Costs = {
-            Water = math.huge
-        }
+        WaypointSpacing = 4
     })
     
     local success, errorMsg = pcall(function()
@@ -95,7 +93,8 @@ local function CreatePath(targetPosition)
     end)
     
     if success and path.Status == Enum.PathStatus.Success then
-        return path
+        -- Return waypoints array (proven working pattern!)
+        return path:GetWaypoints()
     else
         DebugPrint("Path failed: " .. tostring(path.Status))
         return nil
@@ -189,15 +188,15 @@ local function StartPatrol()
     
     DebugPrint("New patrol target: " .. tostring(targetPos))
     
-    local path = CreatePath(targetPos)
-    if path then
-        State.CurrentPath = path
+    local waypoints = CreatePath(targetPos)
+    if waypoints then
+        State.CurrentPath = waypoints
         State.CurrentWaypointIndex = 1
-        DebugPrint("Path created with " .. #path:GetWaypoints() .. " waypoints")
+        DebugPrint("Path created with " .. #waypoints .. " waypoints")
     else
-        -- Fallback: direct movement without pathfinding
-        DebugPrint("Using direct movement fallback")
-        MoveToPosition(targetPos)
+        -- No pathfinding, will use direct movement
+        DebugPrint("No path, will move directly")
+        State.CurrentPath = nil
     end
 end
 
@@ -206,12 +205,11 @@ local function UpdatePathfinding()
         return false
     end
     
-    local waypoints = State.CurrentPath:GetWaypoints()
+    local waypoints = State.CurrentPath
     
     -- Check if finished path
     if State.CurrentWaypointIndex > #waypoints then
         DebugPrint("Reached end of path")
-        StopMoving()
         return false
     end
     
@@ -219,12 +217,12 @@ local function UpdatePathfinding()
     local distance = (currentWaypoint.Position - RootPart.Position).Magnitude
     
     -- Check if reached current waypoint
-    if distance <= Config.WaypointReachedDistance then
+    if distance < Config.WaypointReachedDistance then
         State.CurrentWaypointIndex = State.CurrentWaypointIndex + 1
+        DebugPrint("Reached waypoint " .. (State.CurrentWaypointIndex - 1))
         
         if State.CurrentWaypointIndex > #waypoints then
             DebugPrint("Path completed!")
-            StopMoving()
             return false
         end
         
@@ -237,8 +235,8 @@ local function UpdatePathfinding()
         end
     end
     
-    -- Move towards current waypoint
-    MoveToPosition(currentWaypoint.Position)
+    -- CRITICAL: Use MoveTo (not Move!) - This is the working method!
+    Humanoid:MoveTo(currentWaypoint.Position)
     
     return true
 end
@@ -262,14 +260,6 @@ end
 local function Update()
     if not State.IsActive then return end
     
-    local currentTime = tick()
-    
-    -- Rate limiting
-    if currentTime - State.LastUpdateTime < Config.UpdateRate then
-        return
-    end
-    State.LastUpdateTime = currentTime
-    
     -- Check if character is valid
     if not Character or not Character.Parent then
         DebugPrint("Character lost, stopping bot")
@@ -283,33 +273,41 @@ local function Update()
         return
     end
     
-    -- Update pathfinding if we have a path
-    if State.CurrentPath then
-        local isMoving = UpdatePathfinding()
+    -- Set speed
+    Humanoid.WalkSpeed = Config.WalkSpeed
+    
+    -- Make decisions every 2 seconds
+    local currentTime = tick()
+    if currentTime - State.LastDecisionTime > 2 then
+        State.LastDecisionTime = currentTime
         
-        if not isMoving then
-            -- Path finished, wait a bit then get new target
+        -- Check if need new path
+        if not State.CurrentPath then
+            StartPatrol()
+        end
+    end
+    
+    -- Follow path (THIS RUNS EVERY FRAME - Critical!)
+    if State.CurrentPath then
+        local stillMoving = UpdatePathfinding()
+        
+        if not stillMoving then
+            -- Path finished
+            State.CurrentPath = nil
+            State.CurrentWaypointIndex = 1
+            
+            -- Get new target after a short wait
             wait(1)
             StartPatrol()
         end
     else
-        -- No path, check if we're stuck or need new target
-        if CheckIfStuck() or not State.TargetPosition then
-            StartPatrol()
-        end
-        
-        -- Refresh path periodically
-        if currentTime - State.LastPathTime > Config.PathRefreshInterval then
-            if State.TargetPosition and GetDistanceToTarget() > Config.WaypointReachedDistance then
-                DebugPrint("Refreshing path...")
-                local path = CreatePath(State.TargetPosition)
-                if path then
-                    State.CurrentPath = path
-                    State.CurrentWaypointIndex = 1
-                    State.LastPathTime = currentTime
-                end
+        -- No path, try direct movement to target
+        if State.TargetPosition then
+            local distance = GetDistanceToTarget()
+            if distance > Config.WaypointReachedDistance then
+                Humanoid:MoveTo(State.TargetPosition)
             else
-                -- Reached target, get new one
+                -- Reached target
                 StartPatrol()
             end
         end
